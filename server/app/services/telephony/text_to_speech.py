@@ -26,47 +26,78 @@ class TTSService:
     def __init__(self):
         """Initialize TTS service based on configured provider"""
         self.provider = settings.TTS_PROVIDER.lower()
+        self.client = None
+        self.voice_map = {}
         
-        if self.provider == "google":
-            self._initialize_google()
-        elif self.provider == "elevenlabs":
-            self._initialize_elevenlabs()
-        else:
-            raise ValueError(f"Unsupported TTS provider: {self.provider}")
-    
+        # Lazy initialization - don't initialize clients immediately
+        # This prevents errors during module import when credentials aren't available
+        
     def _initialize_google(self):
         """Initialize Google Text-to-Speech client"""
-        from google.cloud import texttospeech
-        
-        self.client = texttospeech.TextToSpeechClient()
-        
-        # Map of voice types to Google voice names
-        self.voice_map = {
-            "neutral_female": "en-US-Neural2-F",
-            "neutral_male": "en-US-Neural2-D",
-            "professional_female": "en-US-Neural2-E",
-            "professional_male": "en-US-Neural2-J",
-            "friendly_female": "en-US-Wavenet-F",
-            "friendly_male": "en-US-Wavenet-I"
-        }
+        try:
+            from google.cloud import texttospeech
+            
+            self.client = texttospeech.TextToSpeechClient()
+            
+            # Map of voice types to Google voice names
+            self.voice_map = {
+                "neutral_female": "en-US-Neural2-F",
+                "neutral_male": "en-US-Neural2-D",
+                "professional_female": "en-US-Neural2-E",
+                "professional_male": "en-US-Neural2-J",
+                "friendly_female": "en-US-Wavenet-F",
+                "friendly_male": "en-US-Wavenet-I"
+            }
+            
+            logger.info("Google Text-to-Speech client initialized successfully")
+            return True
+            
+        except Exception as e:
+            logger.warning(f"Failed to initialize Google TTS: {str(e)}")
+            return False
     
     def _initialize_elevenlabs(self):
         """Initialize ElevenLabs client"""
-        import elevenlabs
-        
-        elevenlabs.set_api_key(settings.ELEVENLABS_API_KEY)
-        self.client = elevenlabs
-        
-        # Map of voice types to ElevenLabs voice IDs
-        # These are example IDs - in a real implementation, use actual ElevenLabs voice IDs
-        self.voice_map = {
-            "neutral_female": "21m00Tcm4TlvDq8ikWAM",
-            "neutral_male": "AZnzlk1XvdvUeBnXmlld",
-            "professional_female": "EXAVITQu4vr4xnSDxMaL",
-            "professional_male": "VR6AewLTigWG4xSOukaG",
-            "friendly_female": "D38z5RcWu1voky8WS1ja",
-            "friendly_male": "MF3mGyEYCl7XYWbV9V6O"
-        }
+        try:
+            import elevenlabs
+            
+            if not settings.ELEVENLABS_API_KEY:
+                logger.warning("ElevenLabs API key not provided")
+                return False
+                
+            elevenlabs.set_api_key(settings.ELEVENLABS_API_KEY)
+            self.client = elevenlabs
+            
+            # Map of voice types to ElevenLabs voice IDs
+            # These are example IDs - in a real implementation, use actual ElevenLabs voice IDs
+            self.voice_map = {
+                "neutral_female": "21m00Tcm4TlvDq8ikWAM",
+                "neutral_male": "AZnzlk1XvdvUeBnXmlld",
+                "professional_female": "EXAVITQu4vr4xnSDxMaL",
+                "professional_male": "VR6AewLTigWG4xSOukaG",
+                "friendly_female": "D38z5RcWu1voky8WS1ja",
+                "friendly_male": "MF3mGyEYCl7XYWbV9V6O"
+            }
+            
+            logger.info("ElevenLabs client initialized successfully")
+            return True
+            
+        except Exception as e:
+            logger.warning(f"Failed to initialize ElevenLabs: {str(e)}")
+            return False
+    
+    def _ensure_initialized(self) -> bool:
+        """Ensure the TTS client is initialized"""
+        if self.client is not None:
+            return True
+            
+        if self.provider == "google":
+            return self._initialize_google()
+        elif self.provider == "elevenlabs":
+            return self._initialize_elevenlabs()
+        else:
+            logger.error(f"Unsupported TTS provider: {self.provider}")
+            return False
     
     async def synthesize_speech(
         self, 
@@ -94,6 +125,14 @@ class TTSService:
             Dict: Synthesis results including audio data
         """
         try:
+            # Ensure client is initialized
+            if not self._ensure_initialized():
+                return {
+                    "success": False,
+                    "error": "TTS client not initialized",
+                    "audio_data": None
+                }
+            
             # Route to appropriate provider
             if self.provider == "google":
                 return await self._synthesize_google(
