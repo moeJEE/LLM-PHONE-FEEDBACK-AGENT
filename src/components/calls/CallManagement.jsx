@@ -360,7 +360,7 @@ const CallItem = React.memo(({ call, type, onStartCall, onPauseCall, onResumeCal
                   <FileText size={16} className="mr-2" />
                   View Details
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => console.log("Download Recording")}>
+                <DropdownMenuItem onClick={() => showToast("Download Recording", "Download feature coming soon")}>
                   <Download size={16} className="mr-2" />
                   Download Recording
                 </DropdownMenuItem>
@@ -556,7 +556,6 @@ const CallManagement = () => {
         token = await getToken();
       } catch (error) {
         // In debug mode or when not authenticated, proceed without token
-        console.log('No authentication token available, proceeding in debug mode');
       }
       
       if (options.method && ['POST', 'PUT', 'DELETE'].includes(options.method)) {
@@ -574,7 +573,6 @@ const CallManagement = () => {
         return await ApiService.get(endpoint, {}, token);
       }
     } catch (error) {
-      console.error('API request failed:', error);
       throw error;
     }
   }, [getToken]);
@@ -623,12 +621,9 @@ const CallManagement = () => {
     if (!getToken) return;
     
     try {
-      console.log('🔄 Fetching surveys for call scheduling...');
       const surveysResponse = await makeAuthenticatedRequest('/surveys?limit=50');
-      console.log('✅ Surveys fetched successfully:', surveysResponse.length, 'surveys');
       setSurveys(surveysResponse || []);
     } catch (error) {
-      console.error('Error fetching surveys:', error);
       showToast("Warning", "Failed to load surveys. You may need to create surveys first.", "error");
       setSurveys([]);
     } finally {
@@ -641,12 +636,8 @@ const CallManagement = () => {
     if (!getToken) return;
     
     try {
-      console.log('🔄 Fetching knowledge base documents for call scheduling...');
-      
       // Use the correct endpoint - it's /api/knowledge/ not /knowledge
       const knowledgeResponse = await makeAuthenticatedRequest('/knowledge');
-      console.log('✅ Knowledge base API response:', knowledgeResponse);
-      console.log('✅ Knowledge base fetched successfully:', knowledgeResponse.length, 'documents');
       
       // Transform the response to ensure we have the right field names
       const transformedDocs = knowledgeResponse.map(doc => ({
@@ -660,12 +651,6 @@ const CallManagement = () => {
       
       setKnowledgeBase(transformedDocs || []);
     } catch (error) {
-      console.error('Error fetching knowledge base:', error);
-      console.error('Knowledge base error details:', {
-        message: error.message,
-        status: error.status,
-        response: error.response
-      });
       showToast("Warning", "Failed to load knowledge base. You may need to upload documents first.", "error");
       setKnowledgeBase([]);
     } finally {
@@ -860,7 +845,6 @@ const CallManagement = () => {
       showToast("Success", "Call started successfully", "success");
       await fetchCallData(true); // Refresh data
     } catch (error) {
-      console.error('Error starting call:', error);
       showToast("Error", "Failed to start call. Please try again.", "error");
     }
   }, [makeAuthenticatedRequest, showToast, fetchCallData]);
@@ -876,7 +860,6 @@ const CallManagement = () => {
       showToast("Call Paused", "Call has been paused and can be resumed later", "success");
       await fetchCallData(true); // Refresh data
     } catch (error) {
-      console.error('Error pausing call:', error);
       if (error.response?.status === 400) {
         showToast("Cannot Pause", "This call cannot be paused in its current state", "error");
       } else {
@@ -894,7 +877,6 @@ const CallManagement = () => {
       showToast("Call Resumed", "Call has been resumed successfully", "success");
       await fetchCallData(true); // Refresh data
     } catch (error) {
-      console.error('Error resuming call:', error);
       if (error.response?.status === 400) {
         showToast("Cannot Resume", "This call cannot be resumed in its current state", "error");
       } else {
@@ -905,22 +887,13 @@ const CallManagement = () => {
 
   const handleEndCall = useCallback(async (callId) => {
     try {
-      console.log(`Attempting to end call: ${callId}`);
       await makeAuthenticatedRequest(`/calls/${callId}`, { 
         method: 'PUT',
         body: JSON.stringify({ status: 'completed' })
       });
-      console.log(`Successfully ended call: ${callId}`);
       showToast("Success", "Call ended successfully", "success");
       await fetchCallData(true); // Refresh data
     } catch (error) {
-      console.error('Error ending call:', error);
-      console.error('Error details:', {
-        message: error.message,
-        name: error.name,
-        stack: error.stack
-      });
-      
       // Provide more specific error messages
       if (error.message.includes('Network error')) {
         showToast("Network Error", "Unable to connect to server. Please check your connection.", "error");
@@ -950,7 +923,6 @@ const CallManagement = () => {
       showToast("Success", "Call retry initiated successfully", "success");
       await fetchCallData(true); // Refresh data
     } catch (error) {
-      console.error('Error retrying call:', error);
       showToast("Error", "Failed to retry call. Please try again.", "error");
     }
   }, [makeAuthenticatedRequest, showToast, fetchCallData]);
@@ -961,7 +933,6 @@ const CallManagement = () => {
       showToast("Success", "Call cancelled successfully", "success");
       await fetchCallData(true); // Refresh data
     } catch (error) {
-      console.error('Error cancelling call:', error);
       showToast("Error", "Failed to cancel call. Please try again.", "error");
     }
   }, [makeAuthenticatedRequest, showToast, fetchCallData]);
@@ -972,33 +943,28 @@ const CallManagement = () => {
       showToast("WhatsApp Survey Sent", "Survey has been sent via WhatsApp successfully", "success");
       await fetchCallData(true); // Refresh data
     } catch (error) {
-      console.error('Error sending WhatsApp survey:', error);
       showToast("Error", "Failed to send WhatsApp survey. Please try again.", "error");
     }
   }, [makeAuthenticatedRequest, showToast, fetchCallData]);
 
   const handleViewSurveyResults = useCallback(async (callId) => {
     try {
-      console.log(`Fetching survey results for call: ${callId}`);
       const results = await makeAuthenticatedRequest(`/calls/${callId}/survey-results`);
       
       if (results && results.length > 0) {
         // Show results in a dialog or navigate to results page
         showToast("Survey Results", `Found ${results.length} survey result(s)`, "success");
-        console.log('Survey results:', results);
         // TODO: Open survey results dialog or navigate to results page
       } else {
         showToast("No Results", "No survey results found for this call", "info");
       }
     } catch (error) {
-      console.error('Error fetching survey results:', error);
       showToast("Error", "Failed to fetch survey results. Please try again.", "error");
     }
   }, [makeAuthenticatedRequest, showToast]);
 
   const handleViewCallDetails = useCallback(async (callId) => {
     try {
-      console.log(`Fetching details for call: ${callId}`);
       const callDetails = await makeAuthenticatedRequest(`/calls/${callId}`);
       
       // Transform the API response to match the component's expected format
@@ -1036,11 +1002,9 @@ const CallManagement = () => {
         callSid: callDetails.twilio_call_sid
       };
       
-      console.log('Transformed call details:', transformedDetails);
       setSelectedCallDetails(transformedDetails);
       setIsCallDetailsOpen(true);
     } catch (error) {
-      console.error('Error fetching call details:', error);
       showToast("Error", "Failed to load call details. Please try again.", "error");
     }
   }, [makeAuthenticatedRequest, showToast, formatDuration, formatDate]);
@@ -1126,7 +1090,6 @@ const CallManagement = () => {
       });
       setIsSchedulingCall(false);
     } catch (error) {
-      console.error('Error scheduling call:', error);
       showToast(
         "Error", 
         "Failed to schedule call. Please try again.", 
