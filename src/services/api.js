@@ -27,18 +27,14 @@ class ApiService {
       }
       
       const url = `${API_BASE_URL}${endpoint}`;
-      console.log(`Making ${options.method || 'GET'} request to: ${url}`);
 
       const response = await fetch(url, {
         ...options,
         headers,
       });
-
-      console.log(`Response status: ${response.status} ${response.statusText}`);
       
       // Handle token expiration
       if (response.status === 401) {
-        console.warn('Authentication token expired or invalid');
         throw new Error('Authentication failed. Please login again.');
       }
 
@@ -50,13 +46,11 @@ class ApiService {
         try {
           data = await response.json();
         } catch (parseError) {
-          console.error('Failed to parse JSON response:', parseError);
           throw new Error('Invalid JSON response from server');
         }
       } else {
         // Handle non-JSON responses
         const textResponse = await response.text();
-        console.log('Non-JSON response:', textResponse);
         
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${textResponse || response.statusText}`);
@@ -68,20 +62,16 @@ class ApiService {
       // Check if request was successful
       if (!response.ok) {
         const errorMessage = data?.detail || data?.error || data?.message || `HTTP ${response.status}: ${response.statusText}`;
-        console.error(`API error (${response.status}):`, errorMessage);
         throw new Error(errorMessage);
       }
       
-      console.log(`API call successful:`, data);
       return data;
     } catch (error) {
-      // Enhanced error logging
+      // Enhanced error handling
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        console.error(`Network error for ${endpoint}:`, error.message);
         throw new Error('Network error. Please check your connection and try again.');
       }
       
-      console.error(`API error (${endpoint}):`, error.message);
       throw error;
     }
   }
@@ -198,31 +188,25 @@ export async function getCalls(filters = {}, token = null) {
       }
     });
     
-    const endpoint = `/calls/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/calls?${queryParams.toString()}`;
     return await ApiService.get(endpoint, {}, token);
   } catch (error) {
-    console.error('Error fetching calls:', error);
-    throw error;
+    throw new Error(`Failed to fetch calls: ${error.message}`);
   }
 }
 
 /**
  * Get call statistics
- * @param {string} period - Stats period: 'today', 'week', 'month', 'all'
+ * @param {string} period - Time period (all, week, month, year)
  * @param {string|null} token - Authentication token
  * @returns {Promise<Object>} - Call statistics
  */
 export async function getCallStats(period = 'all', token = null) {
   try {
-    const queryParams = new URLSearchParams();
-    if (period && period !== 'all') {
-      queryParams.append('period', period);
-    }
-    const endpoint = `/calls/stats/summary${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const endpoint = `/api/calls/stats?period=${period}`;
     return await ApiService.get(endpoint, {}, token);
   } catch (error) {
-    console.error('Error fetching call stats:', error);
-    throw error;
+    throw new Error(`Failed to fetch call stats: ${error.message}`);
   }
 }
 
@@ -234,10 +218,10 @@ export async function getCallStats(period = 'all', token = null) {
  */
 export async function getCallById(callId, token = null) {
   try {
-    return await ApiService.get(`/calls/${callId}`, {}, token);
+    const endpoint = `/api/calls/${callId}`;
+    return await ApiService.get(endpoint, {}, token);
   } catch (error) {
-    console.error('Error fetching call details:', error);
-    throw error;
+    throw new Error(`Failed to fetch call details: ${error.message}`);
   }
 }
 
@@ -245,41 +229,38 @@ export async function getCallById(callId, token = null) {
  * Create a new call
  * @param {Object} callData - Call data
  * @param {string|null} token - Authentication token
- * @param {boolean} sendWhatsAppSurvey - Send WhatsApp survey immediately
- * @param {boolean} knowledgeBaseOnly - Use knowledge base only without survey
- * @returns {Promise<Object>} - Created call
+ * @param {boolean} sendWhatsAppSurvey - Whether to send WhatsApp survey
+ * @param {boolean} knowledgeBaseOnly - Whether to use knowledge base only
+ * @returns {Promise<Object>} - Created call data
  */
 export async function createCall(callData, token = null, sendWhatsAppSurvey = false, knowledgeBaseOnly = false) {
   try {
-    const params = new URLSearchParams();
-    if (sendWhatsAppSurvey) {
-      params.append('send_whatsapp_survey', 'true');
-    }
-    if (knowledgeBaseOnly) {
-      params.append('knowledge_base_only', 'true');
-    }
+    const endpoint = '/api/calls/';
+    const data = {
+      ...callData,
+      send_whatsapp_survey: sendWhatsAppSurvey,
+      knowledge_base_only: knowledgeBaseOnly,
+    };
     
-    const url = `/calls/${params.toString() ? '?' + params.toString() : ''}`;
-    return await ApiService.post(url, callData, {}, token);
+    return await ApiService.post(endpoint, data, {}, token);
   } catch (error) {
-    console.error('Error creating call:', error);
-    throw error;
+    throw new Error(`Failed to create call: ${error.message}`);
   }
 }
 
 /**
- * Update a call
+ * Update an existing call
  * @param {string} callId - Call ID
- * @param {Object} updateData - Update data
+ * @param {Object} updateData - Data to update
  * @param {string|null} token - Authentication token
- * @returns {Promise<Object>} - Updated call
+ * @returns {Promise<Object>} - Updated call data
  */
 export async function updateCall(callId, updateData, token = null) {
   try {
-    return await ApiService.put(`/calls/${callId}`, updateData, {}, token);
+    const endpoint = `/api/calls/${callId}`;
+    return await ApiService.put(endpoint, updateData, {}, token);
   } catch (error) {
-    console.error('Error updating call:', error);
-    throw error;
+    throw new Error(`Failed to update call: ${error.message}`);
   }
 }
 
@@ -287,43 +268,43 @@ export async function updateCall(callId, updateData, token = null) {
  * Delete a call
  * @param {string} callId - Call ID
  * @param {string|null} token - Authentication token
- * @returns {Promise<void>}
+ * @returns {Promise<Object>} - Deletion confirmation
  */
 export async function deleteCall(callId, token = null) {
   try {
-    return await ApiService.delete(`/calls/${callId}`, {}, token);
+    const endpoint = `/api/calls/${callId}`;
+    return await ApiService.delete(endpoint, {}, token);
   } catch (error) {
-    console.error('Error deleting call:', error);
-    throw error;
+    throw new Error(`Failed to delete call: ${error.message}`);
   }
 }
 
 /**
- * Get survey results for a specific call
+ * Get survey results for a call
  * @param {string} callId - Call ID
  * @param {string|null} token - Authentication token
- * @returns {Promise<Array>} - Survey results
+ * @returns {Promise<Object>} - Survey results
  */
 export async function getCallSurveyResults(callId, token = null) {
   try {
-    return await ApiService.get(`/calls/${callId}/survey-results`, {}, token);
+    const endpoint = `/api/calls/${callId}/survey-results`;
+    return await ApiService.get(endpoint, {}, token);
   } catch (error) {
-    console.error('Error fetching call survey results:', error);
-    throw error;
+    throw new Error(`Failed to fetch survey results: ${error.message}`);
   }
 }
 
 /**
- * Get survey statistics summary
+ * Get survey statistics
  * @param {string|null} token - Authentication token
- * @returns {Promise<Object>} - Survey statistics including type distribution
+ * @returns {Promise<Object>} - Survey statistics
  */
 export async function getSurveyStats(token = null) {
   try {
-    return await ApiService.get('/surveys/stats/summary', {}, token);
+    const endpoint = '/api/surveys/stats';
+    return await ApiService.get(endpoint, {}, token);
   } catch (error) {
-    console.error('Error fetching survey stats:', error);
-    throw error;
+    throw new Error(`Failed to fetch survey stats: ${error.message}`);
   }
 }
 
@@ -332,50 +313,47 @@ export async function getSurveyStats(token = null) {
  */
 
 /**
- * Get dashboard analytics data including sentiment trends and call volume
- * @param {string} period - Time period: 'today', 'week', 'month', 'all'
+ * Get dashboard analytics
+ * @param {string} period - Time period (week, month, year)
  * @param {string|null} token - Authentication token
- * @returns {Promise<Object>} - Dashboard analytics data
+ * @returns {Promise<Object>} - Dashboard analytics
  */
 export async function getDashboardAnalytics(period = 'month', token = null) {
   try {
-    // Get calls data for analytics (limit to 100 per API constraints)
-    const callsData = await getCalls({ limit: 100 }, token);
-    const callStats = await getCallStats(period, token);
-    const surveyStats = await getSurveyStats(token);
+    const endpoint = `/api/analytics/dashboard?period=${period}`;
+    const data = await ApiService.get(endpoint, {}, token);
     
     return {
-      calls: callsData,
-      callStats,
-      surveyStats
+      callStats: data.call_stats || {},
+      callsByStatus: data.calls_by_status || [],
+      callTrends: data.call_trends || [],
+      ...data
     };
   } catch (error) {
-    console.error('Error fetching dashboard analytics:', error);
-    throw error;
+    throw new Error(`Failed to fetch dashboard analytics: ${error.message}`);
   }
 }
 
 /**
- * Get sentiment analysis data for dashboard charts
- * @param {string} period - Time period for analysis
+ * Get sentiment analytics
+ * @param {string} period - Time period (week, month, year)
  * @param {string|null} token - Authentication token
- * @returns {Promise<Object>} - Sentiment analysis data
+ * @returns {Promise<Object>} - Sentiment analytics
  */
 export async function getSentimentAnalytics(period = 'month', token = null) {
   try {
-    // This would need to be implemented on the backend
-    // For now, we'll parse the existing call data to extract sentiment
-    const calls = await getCalls({ limit: 100 }, token);
+    const endpoint = `/api/analytics/sentiment?period=${period}`;
+    const data = await ApiService.get(endpoint, {}, token);
     
-    // Process calls to extract sentiment data
-    const sentimentData = processSentimentData(calls, period);
-    
-    return sentimentData;
+    return {
+      sentimentDistribution: data.sentiment_distribution || [],
+      sentimentTrends: data.sentiment_trends || [],
+      ...data
+    };
   } catch (error) {
-    console.error('Error fetching sentiment analytics:', error);
-    throw error;
+    throw new Error(`Failed to fetch sentiment analytics: ${error.message}`);
   }
-};
+}
 
 /**
  * Get call volume analytics for dashboard charts

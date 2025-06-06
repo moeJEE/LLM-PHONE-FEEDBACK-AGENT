@@ -782,12 +782,10 @@ const SurveyBuilder = () => {
     }
     
     setIsCreating(true);
-    console.log('🆕 Creating new survey:', newSurveyTitle, 'with template:', selectedTemplate);
     
     try {
       let newSurvey;
       if (selectedTemplate === 'blank') {
-        console.log('📝 Using blank template');
         newSurvey = {
           title: newSurveyTitle,
           description: newSurveyDescription,
@@ -804,7 +802,6 @@ const SurveyBuilder = () => {
           questions: []
         };
       } else if (selectedTemplate === 'satisfaction') {
-        console.log('😊 Using satisfaction template');
         newSurvey = {
           title: newSurveyTitle,
           description: newSurveyDescription,
@@ -849,7 +846,6 @@ const SurveyBuilder = () => {
           ]
         };
       } else if (selectedTemplate === 'feedback') {
-        console.log('📝 Using feedback template');
         newSurvey = {
           title: newSurveyTitle,
           description: newSurveyDescription,
@@ -895,7 +891,6 @@ const SurveyBuilder = () => {
         };
       }
       
-      console.log('🔄 Sending create request to API...');
       // Create survey via API
       const response = await fetch(`${API_BASE_URL}/api/surveys/`, {
         method: 'POST',
@@ -907,7 +902,6 @@ const SurveyBuilder = () => {
       });
       
       const createdSurvey = await response.json();
-      console.log('✅ Survey created successfully:', createdSurvey.id, '-', createdSurvey.title);
       
       // Set as current survey
       setCurrentSurvey({
@@ -943,7 +937,6 @@ const SurveyBuilder = () => {
       setIsDirty(false);
       
     } catch (error) {
-      console.error('❌ Failed to create survey:', error);
       showToastMessage(`Failed to create survey: ${error.message}`, 'error');
     } finally {
       setIsCreating(false);
