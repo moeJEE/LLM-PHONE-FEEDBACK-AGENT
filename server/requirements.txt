@@ -1,0 +1,58 @@
+# FastAPI and server
+fastapi>=0.103.1
+uvicorn>=0.23.2
+python-dotenv>=1.0.0
+pydantic>=2.4.0
+pydantic-settings>=2.0.3
+
+
+# Database
+pymongo>=4.5.0
+motor>=3.3.1
+
+# Vector database
+qdrant-client>=1.6.0
+# OR
+# pinecone-client>=2.2.2
+# OR
+# chromadb>=0.4.15
+
+# Document processing
+langchain>=0.0.300
+unstructured>=0.10.30
+pypdf>=3.16.2
+docx2txt>=0.8
+beautifulsoup4>=4.12.2
+
+# LLM integration
+openai>=1.1.0
+anthropic>=0.5.0
+
+# Embeddings
+sentence-transformers>=2.2.2
+
+# Telephony
+twilio>=8.7.0
+
+# Messaging
+vonage>=3.14.0
+
+# Speech services
+deepgram-sdk==2.12.0
+# OR
+# google-cloud-speech>=2.21.0
+
+# Text to speech
+google-cloud-texttospeech>=2.14.1
+# OR
+# elevenlabs>=0.2.24
+
+# Utilities
+tenacity>=8.2.3
+aiohttp>=3.8.5
+pillow>=10.0.1
+pandas>=2.1.1
+numpy>=1.25.2
+
+
+python-multipart

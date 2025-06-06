@@ -1,0 +1,137 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+/server/venv/
+/server/env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# testing
+/coverage
+.pytest_cache/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# production
+/build
+/dist/
+
+# environment variables and secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+.envrc
+
+# logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+/server/logs/
+
+# runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# misc
+.DS_Store
+*.tgz
+*.tar.gz
+
+# MongoDB data
+/data/
+
+# AI/ML specific
+/models/
+/checkpoints/
+/data/raw/
+/data/processed/
+*.pkl
+*.pickle
+*.joblib
+*.h5
+*.hdf5
+/notebooks/.ipynb_checkpoints/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Python specific
+*.so
+.Python
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Temporary files
+*.tmp
+*.temp
+/temp/
+/tmp/
+
+# Uploads and user content
+/uploads/
+/user_files/
+
+# API Keys and certificates
+*.pem
+*.key
+*.crt
+*.p12
+
+# ngrok
+ngrok.exe
+ngrok.yml
+
+# Docker
+.dockerignore
+
+# Test files (only if they contain sensitive data)
+quick_whatsapp_test.py
+test_direct_whatsapp.py
+whatsapp_test.py
+
+# Documentation that might contain sensitive info
+whatsapp_fix_guide.md
