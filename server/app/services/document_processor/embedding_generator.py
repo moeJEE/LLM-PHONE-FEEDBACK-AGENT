@@ -24,11 +24,20 @@ class EmbeddingGenerator:
         """Initialize OpenAI embedding model"""
         from openai import OpenAI
 
-        cleaned_key = settings.OPENAI_API_KEY.strip()
-        print(f"[DEBUG] Cleaned API KEY for client: {repr(cleaned_key)}")
-
-        # Crée un client OpenAI avec la clé propre
-        self.client = OpenAI(api_key=cleaned_key)
+        # Nettoyage et debug de la clé API
+        api_key = settings.OPENAI_API_KEY
+        if api_key:
+            cleaned_key = api_key.strip().strip('"').strip("'")
+            
+            # Use proper logging instead of print for debug
+            if settings.DEBUG:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.debug(f"Cleaned API KEY for client: {repr(cleaned_key)}")
+            
+            self.client = OpenAI(api_key=cleaned_key)
+        else:
+            raise ValueError("OPENAI_API_KEY is required")
     
     def _init_sentence_transformers(self):
         """Initialize Sentence Transformers embedding model"""

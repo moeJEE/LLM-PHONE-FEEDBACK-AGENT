@@ -6,6 +6,7 @@ from pydantic import BaseModel
 import time
 from typing import Optional, Dict, Any
 import os
+import logging
 
 from .config import get_settings
 
@@ -113,7 +114,9 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     """
     # In debug mode, allow bypassing authentication
     if settings.DEBUG and (not credentials or not credentials.credentials):
-        print("[DEBUG] Using default development user (no auth required)")
+        # Use proper logging instead of print in production
+        logger = logging.getLogger(__name__)
+        logger.info("Using default development user (no auth required)")
         return DEFAULT_DEV_USER
     
     # If not in debug mode or credentials are provided, validate normally

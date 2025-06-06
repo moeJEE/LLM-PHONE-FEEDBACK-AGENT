@@ -358,7 +358,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🆘 Support
 
-For support, email support@yourcompany.com or join our [Discord server](https://discord.gg/yourserver).
+For support, email mohkach2001@gmail.com or join our [Discord server](https://discord.com/users/moe9063).
 
 ## 🙏 Acknowledgments
 

@@ -18,23 +18,46 @@ class VectorDB:
         
         if self.db_type == "qdrant":
             from qdrant_client import QdrantClient
-            self.client = QdrantClient(url=settings.QDRANT_URL)
-            print(f"Connected to Qdrant at {settings.QDRANT_URL}")
-            
+            try:
+                qdrant_client = QdrantClient(url=settings.QDRANT_URL)
+                
+                # Use proper logging instead of print
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"Connected to Qdrant at {settings.QDRANT_URL}")
+                return qdrant_client
+            except Exception as e:
+                raise ConnectionError(f"Failed to connect to Qdrant: {e}")
+        
         elif self.db_type == "pinecone":
             import pinecone
-            pinecone.init(
-                api_key=settings.PINECONE_API_KEY,
-                environment=settings.PINECONE_ENVIRONMENT
-            )
-            # Note: You would need to create an index first
-            self.client = pinecone
-            print(f"Connected to Pinecone in {settings.PINECONE_ENVIRONMENT} environment")
+            try:
+                pinecone.init(
+                    api_key=settings.PINECONE_API_KEY,
+                    environment=settings.PINECONE_ENVIRONMENT
+                )
+                index = pinecone.Index("embeddings")
+                
+                # Use proper logging instead of print
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"Connected to Pinecone in {settings.PINECONE_ENVIRONMENT} environment")
+                return index
+            except Exception as e:
+                raise ConnectionError(f"Failed to connect to Pinecone: {e}")
         
         elif self.db_type == "chroma":
             import chromadb
-            self.client = chromadb.Client()
-            print("Connected to local ChromaDB")
+            try:
+                chroma_client = chromadb.Client()
+                
+                # Use proper logging instead of print
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info("Connected to local ChromaDB")
+                return chroma_client
+            except Exception as e:
+                raise ConnectionError(f"Failed to connect to ChromaDB: {e}")
         
         else:
             raise ValueError(f"Unsupported vector database type: {self.db_type}")

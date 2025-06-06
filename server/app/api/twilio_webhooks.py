@@ -130,13 +130,14 @@ async def twilio_gather_webhook(form_data: Dict[str, Any] = Depends(validate_twi
     """
     try:
         call_sid = form_data.get("CallSid")
-        digits = form_data.get("Digits")      # For touchtone input
-        speech_result = form_data.get("SpeechResult")  # For speech input
+        digits = form_data.get("Digits", "")
+        speech_result = form_data.get("SpeechResult", "")
         
-        logger.info(f"Received gather webhook for call {call_sid}")
-        logger.debug(f"Gather input - Digits: {digits}, Speech: {speech_result}")
+        # Log input received (without sensitive data)
+        input_type = "digits" if digits else "speech" if speech_result else "none"
+        logger.info(f"Gather input received - Type: {input_type}")
         
-        # Retrieve call document using twilio_call_sid
+        # Get call from database
         calls_collection = MongoDB.get_collection("calls")
         call = await calls_collection.find_one({"twilio_call_sid": call_sid})
         if not call:
@@ -324,7 +325,7 @@ async def twilio_gather_webhook(form_data: Dict[str, Any] = Depends(validate_twi
         next_question = survey["questions"][current_index]
         logger.info(f"Generating question prompt for: {next_question.get('text', 'N/A')}")
         
-        # TEMPORARY: Simple fallback to avoid AI complexity
+        # Generate AI-enhanced question with fallback handling
         try:
             ai_response = await llm_orchestrator.generate_question_prompt(
                 question=next_question,
@@ -334,7 +335,7 @@ async def twilio_gather_webhook(form_data: Dict[str, Any] = Depends(validate_twi
             logger.info(f"AI response generated: {ai_response}")
         except Exception as ai_error:
             logger.warning(f"AI generation failed, using fallback: {ai_error}")
-            # Fallback to simple question text
+            # Graceful fallback to simple question text
             ai_response = {
                 "text": next_question.get("text", "Please tell me your thoughts on this topic."),
                 "metadata": {"fallback": True}

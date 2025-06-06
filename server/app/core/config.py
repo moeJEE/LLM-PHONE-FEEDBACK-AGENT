@@ -3,6 +3,7 @@ from functools import lru_cache
 from typing import Optional, List
 from pathlib import Path
 from dotenv import load_dotenv
+from pydantic import field_validator
 
 # Charger automatiquement server/.env au démarrage
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / ".env", override=True)
@@ -73,29 +74,43 @@ class Settings(BaseSettings):
     CLERK_INSTANCE_ID: str
     CLERK_SECRET_KEY: str
 
+    @field_validator("OPENAI_API_KEY")
+    @classmethod
+    def validate_openai_api_key(cls, v: str) -> str:
+        """Validate and clean OpenAI API key"""
+        if not v or v in ["YOUR_OPENAI_API_KEY", "your_openai_api_key_here"]:
+            raise ValueError("OPENAI_API_KEY is required and must be set to a valid API key")
+        
+        # Clean the API key
+        cleaned = v.strip().strip('"').strip("'")
+        
+        # Validate format (starts with sk- and has reasonable length)
+        if not cleaned.startswith("sk-") or len(cleaned) < 20:
+            raise ValueError("OPENAI_API_KEY must start with 'sk-' and be a valid OpenAI API key")
+        
+        # Remove debug print statement
+        # Only log in debug mode with proper logging
+        if cls.DEBUG:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Cleaned API KEY: {repr(cleaned)}")
+        
+        return cleaned
 
 @lru_cache()
 def get_settings():
+    """Get application settings with validation"""
     s = Settings()
 
-    # Nettoyage et debug
+    # Clean and validate API key if provided
     if s.OPENAI_API_KEY:
         s.OPENAI_API_KEY = s.OPENAI_API_KEY.strip()
-        print(f"[DEBUG] Cleaned API KEY: {repr(s.OPENAI_API_KEY)}")
-    else:
-        print("[DEBUG] OPENAI_API_KEY not found in env")
-
-    print(f"[DEBUG] TWILIO_ACCOUNT_SID: {repr(s.TWILIO_ACCOUNT_SID)}")
-    print(f"[DEBUG] TWILIO_AUTH_TOKEN: {repr(s.TWILIO_AUTH_TOKEN)}")
-    print(f"[DEBUG] TWILIO_PHONE_NUMBER: {repr(s.TWILIO_PHONE_NUMBER)}")
-    print(f"[DEBUG] TWILIO_WEBHOOK_URL: {repr(s.TWILIO_WEBHOOK_URL)}")
-    print(f"[DEBUG] TWILIO_STATUS_CALLBACK_URL: {repr(s.TWILIO_STATUS_CALLBACK_URL)}")
-    print(f"[DEBUG] TWILIO_WHATSAPP_FROM: {repr(s.TWILIO_WHATSAPP_FROM)}")
-    print(f"[DEBUG] TWILIO_WHATSAPP_CONTENT_SID: {repr(s.TWILIO_WHATSAPP_CONTENT_SID)}")
-
-    print(f"[DEBUG] NEXMO_API_KEY: {repr(s.NEXMO_API_KEY)}")
-    print(f"[DEBUG] NEXMO_API_SECRET: {repr(s.NEXMO_API_SECRET[:8])}...")
-    print(f"[DEBUG] NEXMO_WHATSAPP_FROM: {repr(s.NEXMO_WHATSAPP_FROM)}")
-    print(f"[DEBUG] WHATSAPP_SIMULATION_MODE: {s.WHATSAPP_SIMULATION_MODE}")
+        
+        # Only log in debug mode with proper logging
+        if s.DEBUG:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"OpenAI API key configured: {s.OPENAI_API_KEY[:8]}...")
+            logger.debug(f"WhatsApp simulation mode: {s.WHATSAPP_SIMULATION_MODE}")
 
     return s
