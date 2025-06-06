@@ -2,134 +2,137 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useClerk, useUser, useAuth } from '@clerk/clerk-react';
 
 // Création du contexte d'authentification
-const AuthContext = createContext(null);
+const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
-  const { isLoaded, isSignedIn, user } = useUser();
-  const { getToken } = useAuth();
+  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { user } = useUser();
   const { signOut } = useClerk();
-  const [authToken, setAuthToken] = useState(null);
+  const [userToken, setUserToken] = useState(null);
+  const [lastTokenFetch, setLastTokenFetch] = useState(null);
+  const [tokenError, setTokenError] = useState(null);
 
-  // Récupération initiale et stockage du token dans sessionStorage
-  useEffect(() => {
-    const fetchToken = async () => {
-      if (isSignedIn) {
-        try {
-          const token = await getToken();
-          setAuthToken(token);
-          sessionStorage.setItem('authToken', token);
-        } catch (error) {
-          console.error('Error fetching token:', error);
-          sessionStorage.removeItem('authToken');
-        }
-      } else {
-        setAuthToken(null);
-        sessionStorage.removeItem('authToken');
+  const fetchUserToken = async () => {
+    try {
+      if (!isSignedIn) {
+        setUserToken(null);
+        setTokenError(null);
+        return null;
       }
-    };
-
-    if (isLoaded) {
-      fetchToken();
+      const token = await getToken();
+      setUserToken(token);
+      setLastTokenFetch(Date.now());
+      setTokenError(null);
+      return token;
+    } catch (error) {
+      setTokenError('Failed to fetch authentication token');
+      return null;
     }
-  }, [isLoaded, isSignedIn, getToken]);
+  };
 
-  // Mécanisme de rafraîchissement du token (par exemple toutes les 15 secondes)
-  useEffect(() => {
-    let intervalId = null;
-
-    const refreshToken = async () => {
-      if (isSignedIn) {
-        try {
-          // Force le rafraîchissement du token
-          const token = await getToken({ forceRefresh: true });
-          setAuthToken(token);
-          sessionStorage.setItem('authToken', token);
-          console.log('Token rafraîchi');
-        } catch (error) {
-          console.error('Error refreshing token:', error);
-        }
+  const refreshToken = async () => {
+    try {
+      if (!isSignedIn) {
+        setUserToken(null);
+        return null;
       }
-    };
-
-    // Définir l'intervalle pour rafraîchir le token régulièrement
-    if (isSignedIn) {
-      intervalId = setInterval(refreshToken, 15000); // toutes les 15 secondes, ajustez selon vos besoins
+      const token = await getToken({ template: 'default' });
+      setUserToken(token);
+      setLastTokenFetch(Date.now());
+      setTokenError(null);
+      return token;
+    } catch (error) {
+      setTokenError('Failed to refresh authentication token');
+      return null;
     }
+  };
 
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [isSignedIn, getToken]);
-
-  // Fonction de déconnexion
   const handleSignOut = async () => {
     try {
+      setUserToken(null);
+      setLastTokenFetch(null);
+      setTokenError(null);
       await signOut();
-      sessionStorage.removeItem('authToken');
       return true;
     } catch (error) {
-      console.error('Sign out error:', error);
+      setTokenError('Failed to sign out');
       return false;
     }
   };
 
-  // Fonction pour obtenir le rôle de l'utilisateur
+  const getUserInfo = () => {
+    if (!user) {
+      return null;
+    }
+    return {
+      id: user.id,
+      email: user.primaryEmailAddress?.emailAddress,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      imageUrl: user.imageUrl,
+    };
+  };
+
   const getUserRole = () => {
     if (!isSignedIn || !user) return null;
     return user.publicMetadata?.role || 'user';
   };
 
-  // Vérifie si l'utilisateur est administrateur
   const isUserAdmin = () => {
     return getUserRole() === 'admin';
   };
 
-  // Fonction optionnelle pour récupérer le token à la demande
   const getAuthToken = async () => {
-    if (!isSignedIn) return null;
     try {
-      const token = await getToken({ forceRefresh: true });
-      return token;
+      // If we have a recent token (less than 5 minutes old), use it
+      if (userToken && lastTokenFetch && (Date.now() - lastTokenFetch) < 300000) {
+        return userToken;
+      }
+      
+      // Otherwise, fetch a new token
+      return await fetchUserToken();
     } catch (error) {
-      console.error('Error getting auth token:', error);
+      setTokenError('Failed to get authentication token');
       return null;
     }
   };
 
-  // Valeurs du contexte à fournir aux consommateurs
-  const authValues = {
-    isAuthenticated: isSignedIn,
-    user: isSignedIn
-      ? {
-          id: user.id,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email:
-            user.emailAddresses && user.emailAddresses.length > 0
-              ? user.emailAddresses[0].emailAddress
-              : '',
-          imageUrl: user.imageUrl,
-        }
-      : null,
-    isAdmin: isUserAdmin(),
-    userRole: getUserRole(),
-    authLoading: !isLoaded,
+  // Auto-refresh token on auth state changes
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      fetchUserToken();
+    } else if (isLoaded && !isSignedIn) {
+      setUserToken(null);
+      setLastTokenFetch(null);
+      setTokenError(null);
+    }
+  }, [isLoaded, isSignedIn]);
+
+  const value = {
+    isLoaded,
+    isSignedIn,
+    user: getUserInfo(),
+    userToken,
+    tokenError,
+    fetchUserToken,
+    refreshToken,
     signOut: handleSignOut,
-    authToken,       // Le token stocké dans le state et dans sessionStorage
-    getAuthToken,    // Fonction pour récupérer à la demande un token mis à jour
+    getAuthToken,
+    getUserRole,
+    isUserAdmin,
   };
 
   return (
-    <AuthContext.Provider value={authValues}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Hook personnalisé pour utiliser le contexte
+// Hook pour utiliser le contexte d'authentification
 export const useAppAuth = () => {
   const context = useContext(AuthContext);
-  if (context === null) {
+  if (!context) {
     throw new Error('useAppAuth must be used within an AuthProvider');
   }
   return context;

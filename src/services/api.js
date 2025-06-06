@@ -1,5 +1,7 @@
 // src/services/api.js
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000/api';
+import { SignIn } from '@clerk/clerk-react';
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 /**
  * API service for making authenticated requests
@@ -151,37 +153,29 @@ export default ApiService;
 /**
  * Test backend connection (does not require authentication)
  */
-export const testBackendConnection = async () => {
+export async function checkBackendConnection() {
   try {
-    // Utilisez l'URL de base sans "/api" pour l'endpoint /health
-    const baseUrl = API_BASE_URL.split('/api')[0]; // Extrait la partie avant '/api'
+    const baseUrl = API_BASE_URL.replace(/\/+$/, '');
     const healthUrl = `${baseUrl}/health`;
-    
-    console.log('API_BASE_URL:', API_BASE_URL);
-    console.log('baseUrl:', baseUrl);
-    console.log('Testing connection to:', healthUrl);
     
     const response = await fetch(healthUrl, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json',
+        'Content-Type': 'application/json',
       },
-      // Important en cas de problème CORS
-      mode: 'cors'
+      timeout: 5000, // 5 second timeout
     });
-    
+
     if (!response.ok) {
-      throw new Error(`Health check failed with status ${response.status}`);
+      throw new Error(`Health check failed: ${response.status}`);
     }
-    
+
     const data = await response.json();
-    console.log('Backend connection test successful:', data);
-    return data;
+    return { success: true, data };
   } catch (error) {
-    console.error('Backend connection failed:', error);
-    throw error;
+    return { success: false, error: error.message };
   }
-};
+}
 
 /**
  * Call Management API functions
@@ -193,7 +187,7 @@ export const testBackendConnection = async () => {
  * @param {string|null} token - Authentication token
  * @returns {Promise<Object>} - Calls data grouped by status
  */
-export const getCalls = async (filters = {}, token = null) => {
+export async function getCalls(filters = {}, token = null) {
   try {
     const queryParams = new URLSearchParams();
     
@@ -210,7 +204,7 @@ export const getCalls = async (filters = {}, token = null) => {
     console.error('Error fetching calls:', error);
     throw error;
   }
-};
+}
 
 /**
  * Get call statistics
@@ -218,7 +212,7 @@ export const getCalls = async (filters = {}, token = null) => {
  * @param {string|null} token - Authentication token
  * @returns {Promise<Object>} - Call statistics
  */
-export const getCallStats = async (period = 'all', token = null) => {
+export async function getCallStats(period = 'all', token = null) {
   try {
     const queryParams = new URLSearchParams();
     if (period && period !== 'all') {
@@ -230,7 +224,7 @@ export const getCallStats = async (period = 'all', token = null) => {
     console.error('Error fetching call stats:', error);
     throw error;
   }
-};
+}
 
 /**
  * Get a specific call by ID
@@ -238,14 +232,14 @@ export const getCallStats = async (period = 'all', token = null) => {
  * @param {string|null} token - Authentication token
  * @returns {Promise<Object>} - Call details
  */
-export const getCallById = async (callId, token = null) => {
+export async function getCallById(callId, token = null) {
   try {
     return await ApiService.get(`/calls/${callId}`, {}, token);
   } catch (error) {
     console.error('Error fetching call details:', error);
     throw error;
   }
-};
+}
 
 /**
  * Create a new call
@@ -255,7 +249,7 @@ export const getCallById = async (callId, token = null) => {
  * @param {boolean} knowledgeBaseOnly - Use knowledge base only without survey
  * @returns {Promise<Object>} - Created call
  */
-export const createCall = async (callData, token = null, sendWhatsAppSurvey = false, knowledgeBaseOnly = false) => {
+export async function createCall(callData, token = null, sendWhatsAppSurvey = false, knowledgeBaseOnly = false) {
   try {
     const params = new URLSearchParams();
     if (sendWhatsAppSurvey) {
@@ -271,7 +265,7 @@ export const createCall = async (callData, token = null, sendWhatsAppSurvey = fa
     console.error('Error creating call:', error);
     throw error;
   }
-};
+}
 
 /**
  * Update a call
@@ -280,14 +274,14 @@ export const createCall = async (callData, token = null, sendWhatsAppSurvey = fa
  * @param {string|null} token - Authentication token
  * @returns {Promise<Object>} - Updated call
  */
-export const updateCall = async (callId, updateData, token = null) => {
+export async function updateCall(callId, updateData, token = null) {
   try {
     return await ApiService.put(`/calls/${callId}`, updateData, {}, token);
   } catch (error) {
     console.error('Error updating call:', error);
     throw error;
   }
-};
+}
 
 /**
  * Delete a call
@@ -295,14 +289,14 @@ export const updateCall = async (callId, updateData, token = null) => {
  * @param {string|null} token - Authentication token
  * @returns {Promise<void>}
  */
-export const deleteCall = async (callId, token = null) => {
+export async function deleteCall(callId, token = null) {
   try {
     return await ApiService.delete(`/calls/${callId}`, {}, token);
   } catch (error) {
     console.error('Error deleting call:', error);
     throw error;
   }
-};
+}
 
 /**
  * Get survey results for a specific call
@@ -310,28 +304,28 @@ export const deleteCall = async (callId, token = null) => {
  * @param {string|null} token - Authentication token
  * @returns {Promise<Array>} - Survey results
  */
-export const getCallSurveyResults = async (callId, token = null) => {
+export async function getCallSurveyResults(callId, token = null) {
   try {
     return await ApiService.get(`/calls/${callId}/survey-results`, {}, token);
   } catch (error) {
     console.error('Error fetching call survey results:', error);
     throw error;
   }
-};
+}
 
 /**
  * Get survey statistics summary
  * @param {string|null} token - Authentication token
  * @returns {Promise<Object>} - Survey statistics including type distribution
  */
-export const getSurveyStats = async (token = null) => {
+export async function getSurveyStats(token = null) {
   try {
     return await ApiService.get('/surveys/stats/summary', {}, token);
   } catch (error) {
     console.error('Error fetching survey stats:', error);
     throw error;
   }
-};
+}
 
 /**
  * Dashboard Analytics API functions
@@ -343,7 +337,7 @@ export const getSurveyStats = async (token = null) => {
  * @param {string|null} token - Authentication token
  * @returns {Promise<Object>} - Dashboard analytics data
  */
-export const getDashboardAnalytics = async (period = 'month', token = null) => {
+export async function getDashboardAnalytics(period = 'month', token = null) {
   try {
     // Get calls data for analytics (limit to 100 per API constraints)
     const callsData = await getCalls({ limit: 100 }, token);
@@ -359,7 +353,7 @@ export const getDashboardAnalytics = async (period = 'month', token = null) => {
     console.error('Error fetching dashboard analytics:', error);
     throw error;
   }
-};
+}
 
 /**
  * Get sentiment analysis data for dashboard charts
@@ -367,7 +361,7 @@ export const getDashboardAnalytics = async (period = 'month', token = null) => {
  * @param {string|null} token - Authentication token
  * @returns {Promise<Object>} - Sentiment analysis data
  */
-export const getSentimentAnalytics = async (period = 'month', token = null) => {
+export async function getSentimentAnalytics(period = 'month', token = null) {
   try {
     // This would need to be implemented on the backend
     // For now, we'll parse the existing call data to extract sentiment
@@ -389,7 +383,7 @@ export const getSentimentAnalytics = async (period = 'month', token = null) => {
  * @param {string|null} token - Authentication token
  * @returns {Promise<Object>} - Call volume data
  */
-export const getCallVolumeAnalytics = async (period = 'week', token = null) => {
+export async function getCallVolumeAnalytics(period = 'week', token = null) {
   try {
     const calls = await getCalls({ limit: 100 }, token);
     
@@ -398,10 +392,9 @@ export const getCallVolumeAnalytics = async (period = 'week', token = null) => {
     
     return volumeData;
   } catch (error) {
-    console.error('Error fetching call volume analytics:', error);
-    throw error;
+    throw new Error(`Failed to fetch call volume analytics: ${error.message}`);
   }
-};
+}
 
 /**
  * Helper function to process sentiment data from calls
@@ -415,7 +408,6 @@ function processSentimentData(calls, period) {
   
   // Ensure calls is an array
   if (!Array.isArray(calls)) {
-    console.warn('Calls data is not an array, using empty array');
     calls = [];
   }
   
@@ -492,7 +484,6 @@ function processCallVolumeData(calls, period) {
   
   // Ensure calls is an array
   if (!Array.isArray(calls)) {
-    console.warn('Calls data is not an array, using empty array');
     calls = [];
   }
   
@@ -523,7 +514,6 @@ function processCallVolumeData(calls, period) {
       
       if (volumeByPeriod[periodKey]) {
         // Determine call direction based on call type or status
-        // This might need adjustment based on your call data structure
         if (call.call_type === 'inbound' || (call.phone_number && call.phone_number.includes('inbound'))) {
           volumeByPeriod[periodKey].inbound++;
         } else {
@@ -546,14 +536,13 @@ function processCallVolumeData(calls, period) {
  * @param {string|null} token - Authentication token
  * @returns {Promise<Object>} - Initiated call
  */
-export const initiateCall = async (callData, token = null) => {
+export async function initiateCall(callData, token = null) {
   try {
     return await ApiService.post('/calls/initiate', callData, {}, token);
   } catch (error) {
-    console.error('Error initiating call:', error);
-    throw error;
+    throw new Error(`Failed to initiate call: ${error.message}`);
   }
-};
+}
 
 /**
  * Knowledge Base API functions
@@ -565,7 +554,7 @@ export const initiateCall = async (callData, token = null) => {
  * @param {string|null} token - Authentication token
  * @returns {Promise<Array>} - Array of documents
  */
-export const getDocuments = async (filters = {}, token = null) => {
+export async function getDocuments(filters = {}, token = null) {
   try {
     const queryParams = new URLSearchParams();
     
@@ -579,143 +568,96 @@ export const getDocuments = async (filters = {}, token = null) => {
     const endpoint = `/knowledge${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     return await ApiService.get(endpoint, {}, token);
   } catch (error) {
-    console.error('Error fetching documents:', error);
-    throw error;
+    throw new Error(`Failed to fetch documents: ${error.message}`);
   }
-};
+}
 
 /**
- * Get a specific document by ID
+ * Get document by ID
  * @param {string} documentId - Document ID
  * @param {string|null} token - Authentication token
  * @returns {Promise<Object>} - Document data
  */
-export const getDocumentById = async (documentId, token = null) => {
+export async function getDocumentById(documentId, token = null) {
   try {
     return await ApiService.get(`/knowledge/${documentId}`, {}, token);
   } catch (error) {
-    console.error(`Error fetching document ${documentId}:`, error);
-    throw error;
+    throw new Error(`Failed to fetch document: ${error.message}`);
   }
-};
+}
 
 /**
- * Upload a new document
- * @param {FormData} formData - Form data containing file and metadata
+ * Upload document to knowledge base
+ * @param {FormData} formData - Form data with file and metadata
  * @param {string|null} token - Authentication token
- * @returns {Promise<Object>} - Created document data
+ * @returns {Promise<Object>} - Upload result
  */
-export const uploadDocument = async (formData, token = null) => {
+export async function uploadDocument(formData, token = null) {
   try {
-    const headers = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    // Don't set Content-Type for FormData, let browser set it with boundary
-    
-    const url = `${API_BASE_URL}/knowledge/upload`;
-    console.log(`Making POST request to: ${url}`);
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
-    
-    console.log(`Response status: ${response.status} ${response.statusText}`);
-    
-    if (response.status === 401) {
-      console.warn('Authentication token expired or invalid');
-      throw new Error('Authentication failed. Please login again.');
-    }
-    
-    let data;
-    const contentType = response.headers.get('content-type');
-    
-    if (contentType && contentType.includes('application/json')) {
-      data = await response.json();
-    } else {
-      const textResponse = await response.text();
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${textResponse || response.statusText}`);
-      }
-      return textResponse;
-    }
-    
-    if (!response.ok) {
-      const errorMessage = data?.detail || data?.error || data?.message || `HTTP ${response.status}: ${response.statusText}`;
-      console.error(`Upload error (${response.status}):`, errorMessage);
-      throw new Error(errorMessage);
-    }
-    
-    console.log(`Document upload successful:`, data);
-    return data;
+    return await ApiService.post('/knowledge/upload', formData, {
+      'Content-Type': undefined, // Let browser set content type for FormData
+    }, token);
   } catch (error) {
-    console.error('Error uploading document:', error);
-    throw error;
+    throw new Error(`Failed to upload document: ${error.message}`);
   }
-};
+}
 
 /**
- * Delete a document
+ * Delete document from knowledge base
  * @param {string} documentId - Document ID
  * @param {string|null} token - Authentication token
  * @returns {Promise<void>}
  */
-export const deleteDocument = async (documentId, token = null) => {
+export async function deleteDocument(documentId, token = null) {
   try {
     return await ApiService.delete(`/knowledge/${documentId}`, {}, token);
   } catch (error) {
-    console.error(`Error deleting document ${documentId}:`, error);
-    throw error;
+    throw new Error(`Failed to delete document: ${error.message}`);
   }
-};
+}
 
 /**
- * Update a document
+ * Update document metadata
  * @param {string} documentId - Document ID
- * @param {Object} updateData - Data to update
+ * @param {Object} updateData - Update data
  * @param {string|null} token - Authentication token
- * @returns {Promise<Object>} - Updated document data
+ * @returns {Promise<Object>} - Updated document
  */
-export const updateDocument = async (documentId, updateData, token = null) => {
+export async function updateDocument(documentId, updateData, token = null) {
   try {
     return await ApiService.put(`/knowledge/${documentId}`, updateData, {}, token);
   } catch (error) {
-    console.error(`Error updating document ${documentId}:`, error);
-    throw error;
+    throw new Error(`Failed to update document: ${error.message}`);
   }
-};
+}
 
 /**
  * Search documents in knowledge base
- * @param {Object} searchQuery - Search query object {query, filters?, top_k?}
+ * @param {string} searchQuery - Search query
  * @param {string|null} token - Authentication token
- * @returns {Promise<Array>} - Array of search results
+ * @returns {Promise<Array>} - Search results
  */
-export const searchDocuments = async (searchQuery, token = null) => {
+export async function searchDocuments(searchQuery, token = null) {
   try {
-    return await ApiService.post('/knowledge/search', searchQuery, {}, token);
+    return await ApiService.post('/knowledge/search', { query: searchQuery }, {}, token);
   } catch (error) {
-    console.error('Error searching documents:', error);
-    throw error;
+    throw new Error(`Failed to search documents: ${error.message}`);
   }
-};
+}
 
 /**
- * Create a knowledge base inquiry (no survey needed)
- * @param {Object} inquiryData - Inquiry data {phone_number, knowledge_base_id, product_context, send_immediately}
+ * Create knowledge inquiry
+ * @param {Object} inquiryData - Inquiry data
  * @param {string|null} token - Authentication token
- * @returns {Promise<Object>} - Created knowledge inquiry
+ * @returns {Promise<Object>} - Created inquiry
  */
-export const createKnowledgeInquiry = async (inquiryData, token = null) => {
+export async function createKnowledgeInquiry(inquiryData, token = null) {
   try {
-    return await ApiService.post('/calls/knowledge-inquiry', inquiryData, {}, token);
+    return await ApiService.post('/knowledge/inquiries', inquiryData, {}, token);
   } catch (error) {
-    console.error('Error creating knowledge inquiry:', error);
-    throw error;
+    throw new Error(`Failed to create knowledge inquiry: ${error.message}`);
   }
-};
+}
 
 // Optimization API endpoints
 export const optimizationAPI = {

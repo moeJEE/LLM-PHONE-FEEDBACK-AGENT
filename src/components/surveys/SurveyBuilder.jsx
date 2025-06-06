@@ -30,6 +30,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHeader, TableRow, TableHead
 } from "@/components/ui/table";
+import { v4 as uuidv4 } from 'uuid';
 
 // Skeleton Components for SurveyBuilder
 const SurveyListSkeleton = () => (
@@ -128,7 +129,7 @@ const SurveySettingsSkeleton = () => (
 );
 
 const SurveyBuilder = () => {
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn, user } = useAuth();
   
   // API Configuration
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
@@ -142,46 +143,17 @@ const SurveyBuilder = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Helper function to make authenticated API calls
-  const makeAuthenticatedRequest = useCallback(async (url, options = {}) => {
+  const authToken = useCallback(async () => {
     try {
-      let token = null;
-      
-      // Only get token if user is signed in (not in debug mode)
-      try {
-        token = await getToken();
-      } catch (error) {
-        // In debug mode or when not authenticated, proceed without token
-        console.log('No authentication token available, proceeding in debug mode');
+      if (isSignedIn && user) {
+        const freshToken = await getToken();
+        return freshToken;
       }
-      
-      const headers = {
-        'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` }),
-        ...options.headers,
-      };
-      
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      });
-      
-      if (!response.ok) {
-        let errorText;
-        try {
-          const errorData = await response.json();
-          errorText = errorData.detail || errorData.message || `HTTP ${response.status}`;
-        } catch {
-          errorText = await response.text() || `HTTP ${response.status}`;
-        }
-        throw new Error(errorText);
-      }
-      
-      return response;
+      return null;
     } catch (error) {
-      console.error('API request failed:', error);
-      throw error;
+      return null;
     }
-  }, [getToken]);
+  }, [isSignedIn, user, getToken]);
 
   // Existing state for survey management
   const [currentSurvey, setCurrentSurvey] = useState({
@@ -225,102 +197,62 @@ const SurveyBuilder = () => {
   }, []);
   
   // ***** Updated to fetch real data from backend *****
-  useEffect(() => {
-    fetchSurveys();
-  }, []);
-  
-  // Mark survey as dirty when changes occur
-  useEffect(() => {
-    setIsDirty(true);
-  }, [currentSurvey]);
-  
-  const fetchSurveys = useCallback(async (refresh = false) => {
+  const loadSurveys = useCallback(async () => {
     try {
-      if (refresh) {
-        setIsRefreshing(true);
-      } else {
-        setIsLoading(true);
+      setIsLoading(true);
+      
+      const token = await authToken();
+      
+      if (!token) {
+        // User is not authenticated
+        setAllSurveys([]);
+        return;
       }
+
+      // Proceed with authenticated request
+      const response = await fetch(`${API_BASE_URL}/api/surveys/?limit=50`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       
-      console.log('🔄 Fetching surveys from API...');
-      
-      // Debug: Log authentication information
-      try {
-        const token = await getToken();
-        if (token) {
-          console.log('🔐 User is authenticated with token');
-          // Decode the token to see user info (just the header, not sensitive data)
-          const tokenParts = token.split('.');
-          if (tokenParts.length === 3) {
-            const header = JSON.parse(atob(tokenParts[0]));
-            console.log('🔐 Token header:', header);
-          }
-        } else {
-          console.log('🔓 No authentication token, using debug mode');
-        }
-      } catch (authError) {
-        console.log('🔓 Authentication not available, using debug mode');
-      }
-      
-      const response = await makeAuthenticatedRequest(`${API_BASE_URL}/api/surveys/?limit=50`);
       const surveys = await response.json();
+      setAllSurveys(surveys);
       
-      console.log('✅ Surveys fetched successfully:', surveys.length, 'surveys');
-      
-      // Debug: If no surveys, let's check what the backend is returning
       if (surveys.length === 0) {
-        console.log('🔍 No surveys returned. Let\'s check if there are any surveys in the database...');
-        
-        // Try to get some surveys without user filtering (if in debug mode)
+        // No surveys returned
         try {
-          const debugResponse = await fetch(`${API_BASE_URL}/api/surveys/?limit=5&debug=true`);
-          if (debugResponse.ok) {
-            const debugSurveys = await debugResponse.json();
-            console.log('🔍 Debug: Total surveys in database:', debugSurveys.length);
-            if (debugSurveys.length > 0) {
-              console.log('🔍 Debug: Sample survey owner IDs:', debugSurveys.map(s => s.owner_id));
-            }
-          }
+          const debugResponse = await fetch(`${API_BASE_URL}/api/surveys/?limit=5&debug=true`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+          const debugSurveys = await debugResponse.json();
+          
+          setAllSurveys(debugSurveys);
         } catch (debugError) {
-          console.log('🔍 Debug request failed:', debugError.message);
+          // Debug request failed
         }
       }
-      
-      // Transform backend data to match frontend format
-      const transformedSurveys = surveys.map(survey => ({
-        id: survey.id,
-        title: survey.title,
-        status: survey.status,
-        lastModified: new Date(survey.updated_at || survey.created_at).toISOString().split('T')[0],
-        questions: survey.questions?.length || 0
-      }));
-      
-      setAllSurveys(transformedSurveys);
-      
-      console.log('📋 Surveys loaded successfully. User must select a survey or create a new one.');
-      
-      if (refresh) {
-        showToastMessage('Surveys refreshed successfully', 'success');
-      }
-      
+
     } catch (error) {
       console.error('❌ Failed to fetch surveys:', error);
       showToastMessage(`Failed to load surveys: ${error.message}`, 'error');
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false);
     }
-  }, [getToken, makeAuthenticatedRequest, showToastMessage]);
+  }, [authToken]);
   
-  const loadSurvey = async (surveyId) => {
+  const loadSurvey = useCallback(async (surveyId) => {
     try {
-      console.log('📋 Loading survey:', surveyId);
-      const response = await makeAuthenticatedRequest(`${API_BASE_URL}/api/surveys/${surveyId}`);
+      const token = await authToken();
+      const response = await fetch(`${API_BASE_URL}/api/surveys/${surveyId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       const survey = await response.json();
       
-      console.log('✅ Survey loaded successfully:', survey.title);
-      
-      // Transform backend survey to frontend format
       setCurrentSurvey({
         id: survey.id,
         title: survey.title,
@@ -338,88 +270,58 @@ const SurveyBuilder = () => {
         questions: survey.questions || []
       });
       setIsDirty(false);
+      return survey;
     } catch (error) {
       console.error('❌ Failed to load survey:', error);
-      showToastMessage(`Failed to load survey: ${error.message}`, 'error');
+      throw new Error('Failed to load survey. Please try again.');
     }
-  };
+  }, [authToken]);
   
   // ***** Updated saveSurvey to actually save to backend *****
-  const saveSurvey = async () => {
+  const saveSurvey = useCallback(async (surveyData) => {
     setIsSaving(true);
     try {
-      console.log('💾 Saving survey:', currentSurvey.title);
-      
-      // Validate that we have a title
-      if (!currentSurvey.title || currentSurvey.title.trim() === '') {
-        showToastMessage('Please enter a survey title before saving', 'error');
-        return;
-      }
-      
-      const surveyData = {
-        title: currentSurvey.title,
-        description: currentSurvey.description,
-        intro_message: currentSurvey.intro_message,
-        outro_message: currentSurvey.outro_message,
-        voice_type: currentSurvey.voice_type,
-        voice_speed: currentSurvey.voice_speed,
-        max_duration: currentSurvey.max_duration,
-        max_retries: currentSurvey.max_retries,
-        call_during_business_hours: currentSurvey.call_during_business_hours,
-        avoid_weekends: currentSurvey.avoid_weekends,
-        respect_timezone: currentSurvey.respect_timezone,
-        status: currentSurvey.status,
-        questions: currentSurvey.questions
-      };
+      const token = await authToken();
       
       let response;
-      if (currentSurvey.id && !currentSurvey.id.toString().startsWith('survey-') && currentSurvey.id !== null) {
+      
+      if (currentSurvey?.id) {
         // Update existing survey
-        console.log('🔄 Updating existing survey ID:', currentSurvey.id);
-        response = await makeAuthenticatedRequest(
-          `${API_BASE_URL}/api/surveys/${currentSurvey.id}`,
-          {
-            method: 'PUT',
-            body: JSON.stringify(surveyData),
-          }
-        );
+        response = await fetch(`${API_BASE_URL}/api/surveys/${currentSurvey.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(surveyData),
+        });
       } else {
         // Create new survey
-        console.log('🆕 Creating new survey');
-        response = await makeAuthenticatedRequest(
-          `${API_BASE_URL}/api/surveys/`,
-          {
-            method: 'POST',
-            body: JSON.stringify(surveyData),
-          }
-        );
+        response = await fetch(`${API_BASE_URL}/api/surveys/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(surveyData),
+        });
       }
       
       const savedSurvey = await response.json();
-      console.log('✅ Survey saved successfully:', savedSurvey.id);
-      
-      // Update current survey with saved data
-      setCurrentSurvey(prev => ({
-        ...prev,
-        id: savedSurvey.id,
-        title: savedSurvey.title,
-        description: savedSurvey.description,
-        // Keep other fields as they are since user might have modified them
-      }));
       
       showToastMessage('Survey saved successfully', 'success');
       setIsDirty(false);
       
       // Refresh the surveys list
-      fetchSurveys(true);
+      await loadSurveys();
       
+      return savedSurvey;
     } catch (error) {
-      console.error('❌ Failed to save survey:', error);
-      showToastMessage(`Failed to save survey: ${error.message}`, 'error');
+      throw new Error('Failed to save survey. Please try again.');
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [authToken, currentSurvey?.id, showToastMessage, loadSurveys]);
   
   const addQuestion = () => {
     const newId = `q${currentSurvey.questions.length + 1}_new`;
@@ -1017,13 +919,14 @@ const SurveyBuilder = () => {
       
       console.log('🔄 Sending create request to API...');
       // Create survey via API
-      const response = await makeAuthenticatedRequest(
-        `${API_BASE_URL}/api/surveys/`,
-        {
-          method: 'POST',
-          body: JSON.stringify(newSurvey),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/surveys/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await authToken()}`,
+        },
+        body: JSON.stringify(newSurvey),
+      });
       
       const createdSurvey = await response.json();
       console.log('✅ Survey created successfully:', createdSurvey.id, '-', createdSurvey.title);
@@ -1055,7 +958,7 @@ const SurveyBuilder = () => {
       showToastMessage("New survey created successfully", 'success');
       
       // Refresh surveys list
-      fetchSurveys(true);
+      await loadSurveys();
       
       // Switch to builder tab
       setActiveTab('builder');
@@ -1508,7 +1411,7 @@ const SurveyBuilder = () => {
                   <Button 
                     variant="outline"
                     size="sm"
-                    onClick={() => fetchSurveys(true)}
+                    onClick={() => loadSurveys()}
                     disabled={isLoading || isRefreshing}
                   >
                     <RefreshCw size={16} className={`mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
