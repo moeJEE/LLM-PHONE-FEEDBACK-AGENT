@@ -63,46 +63,70 @@ const OptimizationDashboard = () => {
   const fetchOptimizationData = async () => {
     try {
       setLoading(true);
+      const authToken = await getToken();
+      const response = await fetch(`${API_BASE_URL}/api/optimization/recommendations`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
       
-      const token = await getToken();
+      if (!response.ok) {
+        throw new Error('Failed to fetch optimization data');
+      }
       
-      const [analyticsRes, insightsRes, costRes, ragRes] = await Promise.all([
-        optimizationAPI.getTokenAnalytics(timeRange, token),
-        optimizationAPI.getOptimizationInsights(token),
-        optimizationAPI.getCostBreakdown(30, token),
-        optimizationAPI.getRagPerformance(7, token)
-      ]);
-
-      setAnalytics(analyticsRes);
-      setInsights(insightsRes);
-      setCostBreakdown(costRes);
-      setRagPerformance(ragRes);
+      const data = await response.json();
+      setAnalytics(data.analytics);
+      setInsights(data.insights);
+      setCostBreakdown(data.costBreakdown);
+      setRagPerformance(data.ragPerformance);
     } catch (error) {
-      console.error('Error fetching optimization data:', error);
+      // Handle error silently or show user-friendly message
     } finally {
       setLoading(false);
     }
   };
 
-  const handleApplyRecommendation = async (type) => {
+  const applyRecommendation = async (recommendationId) => {
     try {
-      const token = await getToken();
-      await optimizationAPI.applyRecommendation(type, token);
+      const authToken = await getToken();
+      const response = await fetch(`${API_BASE_URL}/api/optimization/apply/${recommendationId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to apply recommendation');
+      }
+      
       // Refresh data after applying recommendation
-      fetchOptimizationData();
+      await fetchOptimizationData();
     } catch (error) {
-      console.error('Error applying recommendation:', error);
+      // Handle error silently or show user-friendly message
     }
   };
 
-  const handleTestOptimization = async (testType) => {
+  const runOptimizationTest = async () => {
     try {
-      const token = await getToken();
-      await optimizationAPI.testOptimization(testType, 10, token);
-      // Refresh data after test
-      fetchOptimizationData();
+      setLoading(true);
+      const authToken = await getToken();
+      const response = await fetch(`${API_BASE_URL}/api/optimization/test`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to run optimization test');
+      }
+      
+      await fetchOptimizationData();
     } catch (error) {
-      console.error('Error running optimization test:', error);
+      // Handle error silently or show user-friendly message
+    } finally {
+      setLoading(false);
     }
   };
 

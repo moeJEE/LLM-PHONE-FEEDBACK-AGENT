@@ -127,7 +127,6 @@ const KnowledgeManagement = () => {
         token = await getToken();
       } catch (error) {
         // In debug mode or when not authenticated, proceed without token
-        console.log('No authentication token available, proceeding in debug mode');
       }
       
       const headers = {
@@ -154,7 +153,6 @@ const KnowledgeManagement = () => {
       
       return response;
     } catch (error) {
-      console.error('API request failed:', error);
       throw error;
     }
   }, [getToken]);
@@ -199,30 +197,8 @@ const KnowledgeManagement = () => {
       }
       setError(null);
       
-      console.log('🔄 Fetching documents from API...');
-      
-      // Debug: Log authentication information
-      try {
-        const token = await getToken();
-        if (token) {
-          console.log('🔐 User is authenticated with token');
-          // Decode the token to see user info (just the header, not sensitive data)
-          const tokenParts = token.split('.');
-          if (tokenParts.length === 3) {
-            const header = JSON.parse(atob(tokenParts[0]));
-            console.log('🔐 Token header:', header);
-          }
-        } else {
-          console.log('🔓 No authentication token, using debug mode');
-        }
-      } catch (authError) {
-        console.log('🔓 Authentication not available, using debug mode');
-      }
-
       const response = await makeAuthenticatedRequest(`${API_BASE_URL}/knowledge/`);
       const documentsData = await response.json();
-      
-      console.log('✅ Documents fetched successfully:', documentsData.length, 'documents');
       
       // Transform backend data to match component expectations
       const transformedDocuments = documentsData.map(doc => ({
@@ -274,7 +250,6 @@ const KnowledgeManagement = () => {
       }
       
     } catch (error) {
-      console.error('❌ Error fetching documents:', error);
       setError('Failed to load documents. Please try again.');
       showToast(
         "Error", 
@@ -300,93 +275,88 @@ const KnowledgeManagement = () => {
   };
 
   // Handle file upload
-  const handleFileUpload = async (event) => {
-    const files = event.target.files;
+  const handleFileUpload = async (files) => {
     if (!files || files.length === 0) return;
-    
-    setIsUploading(true);
-    setUploadStatus('uploading');
-    
+
     try {
-      const uploadPromises = Array.from(files).map(async (file) => {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('name', file.name);
-        formData.append('description', `Uploaded file: ${file.name}`);
+      const token = await getToken();
+      if (!token) {
+        // User is not authenticated, cannot upload
+        showToast("Error", "You must be signed in to upload documents", "error");
+        return;
+      }
+    } catch {
+      showToast("Error", "Authentication required to upload documents", "error");
+      return;
+    }
+
+    const newUploads = [];
+    setIsUploading(true);
+
+    try {
+      for (const file of files) {
+        const fileId = `upload-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         
-        // For FormData uploads, we need to handle headers differently
-        const uploadOptions = {
-          method: 'POST',
-          body: formData,
+        const uploadData = {
+          id: fileId,
+          name: file.name,
+          type: getFileType(file.name),
+          status: 'uploading',
+          uploadDate: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+          size: file.size,
+          progress: 0
         };
         
-        let token = null;
+        newUploads.push(uploadData);
+        setDocuments(prev => [...prev, uploadData]);
+
+        // Upload file
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('document_type', getFileType(file.name));
+        formData.append('tags', JSON.stringify([]));
+        
         try {
-          token = await getToken();
-        } catch (error) {
-          console.log('No authentication token available for upload');
+          const response = await makeAuthenticatedRequest(`${API_BASE_URL}/knowledge/upload`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              // Remove Content-Type to let browser set boundary for FormData
+            }
+          });
+          
+          const uploadedDoc = await response.json();
+          
+          // Update the document in the list
+          setDocuments(prev => prev.map(doc => 
+            doc.id === fileId ? {
+              ...doc,
+              id: uploadedDoc.id,
+              status: 'processed',
+              progress: 100,
+              fileUrl: uploadedDoc.file_url || '#',
+              metadata: uploadedDoc.metadata || {}
+            } : doc
+          ));
+          
+        } catch (uploadError) {
+          // Update status to failed
+          setDocuments(prev => prev.map(doc => 
+            doc.id === fileId ? {
+              ...doc,
+              status: 'failed',
+              progress: 0
+            } : doc
+          ));
+          throw uploadError;
         }
-        
-        const headers = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        
-        const response = await fetch(`${API_BASE_URL}/knowledge/upload`, {
-          ...uploadOptions,
-          headers,
-        });
-        
-        if (!response.ok) {
-          let errorText;
-          try {
-            const errorData = await response.json();
-            errorText = errorData.detail || errorData.message || `HTTP ${response.status}`;
-          } catch {
-            errorText = await response.text() || `HTTP ${response.status}`;
-          }
-          throw new Error(errorText);
-        }
-        
-        return await response.json();
-      });
-      
-      const uploadedDocs = await Promise.all(uploadPromises);
-      
-      setUploadStatus('success');
-      
-      // Refresh documents list to show new uploads
-      await fetchDocuments(true);
-      
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
       }
       
-      showToast(
-        'Files Uploaded', 
-        `Successfully uploaded ${files.length} file${files.length > 1 ? 's' : ''}`, 
-        'success'
-      );
-      
-      // Reset upload status after a delay
-      setTimeout(() => {
-        setUploadStatus('idle');
-      }, 3000);
+      showToast("Success", `${files.length} file(s) uploaded successfully`, "success");
       
     } catch (error) {
-      console.error('❌ Error uploading files:', error);
-      setUploadStatus('error');
-      showToast(
-        'Upload Failed', 
-        error.message || 'Failed to upload files. Please try again.', 
-        'error'
-      );
-      
-      // Reset upload status after a delay
-      setTimeout(() => {
-        setUploadStatus('idle');
-      }, 3000);
+      showToast("Error", `Failed to upload files: ${error.message}`, "error");
     } finally {
       setIsUploading(false);
     }
@@ -410,14 +380,10 @@ const KnowledgeManagement = () => {
     setIsDeleting(true);
     
     try {
-      console.log('🗑️ Deleting document:', documentToDelete.name);
-      
       const response = await makeAuthenticatedRequest(
         `${API_BASE_URL}/knowledge/${documentToDelete.id}`,
         { method: 'DELETE' }
       );
-      
-      console.log('✅ Document deleted successfully');
       
       // Remove document from local state
       setDocuments(prev => prev.filter(doc => doc.id !== documentToDelete.id));
@@ -439,7 +405,6 @@ const KnowledgeManagement = () => {
       await fetchDocuments(true);
       
     } catch (error) {
-      console.error('❌ Error deleting document:', error);
       showToast(
         'Delete Failed', 
         error.message || 'Failed to delete document. Please try again.', 
@@ -454,22 +419,15 @@ const KnowledgeManagement = () => {
 
   // Handle view document details
   const handleViewDocument = async (doc) => {
+    setSelectedDocument(doc);
+    setIsViewDocumentOpen(true);
+    
     try {
       const response = await makeAuthenticatedRequest(`${API_BASE_URL}/knowledge/${doc.id}`);
-      const detailedDoc = await response.json();
-      setSelectedDocument({
-        ...doc,
-        ...detailedDoc,
-        size: detailedDoc.file_size ? formatFileSize(detailedDoc.file_size) : doc.size
-      });
-      setIsViewDocumentOpen(true);
+      const documentDetails = await response.json();
+      setSelectedDocument(prev => ({ ...prev, ...documentDetails }));
     } catch (error) {
-      console.error('❌ Error fetching document details:', error);
-      showToast(
-        'Error', 
-        'Failed to load document details. Please try again.', 
-        'error'
-      );
+      showToast("Error", `Failed to fetch document details: ${error.message}`, "error");
     }
   };
 

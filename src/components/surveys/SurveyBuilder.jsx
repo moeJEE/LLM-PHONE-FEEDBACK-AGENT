@@ -236,7 +236,6 @@ const SurveyBuilder = () => {
       }
 
     } catch (error) {
-      console.error('❌ Failed to fetch surveys:', error);
       showToastMessage(`Failed to load surveys: ${error.message}`, 'error');
     } finally {
       setIsLoading(false);
@@ -272,7 +271,6 @@ const SurveyBuilder = () => {
       setIsDirty(false);
       return survey;
     } catch (error) {
-      console.error('❌ Failed to load survey:', error);
       throw new Error('Failed to load survey. Please try again.');
     }
   }, [authToken]);
@@ -354,40 +352,26 @@ const SurveyBuilder = () => {
   };
 
   const deleteQuestion = (questionId) => {
-    console.log('🗑️ Delete question called for ID:', questionId);
-    console.log('📋 Current questions:', currentSurvey.questions.map(q => ({ id: q.id, text: q.text })));
-    
     // Check if question is referenced in follow-up logic
     const hasReferences = currentSurvey.questions.some(q => {
       const logic = q.follow_up_logic || {};
-      const references = Object.values(logic).includes(questionId);
-      if (references) {
-        console.log('🔗 Question', questionId, 'is referenced in question', q.id, 'logic:', logic);
-      }
-      return references;
+      return Object.values(logic).includes(questionId);
     });
     
     if (hasReferences) {
-      console.log('❌ Cannot delete question - has references in follow-up logic');
       showToastMessage("This question is referenced in follow-up logic. Please update logic before removing.", 'error');
       return;
     }
     
-    console.log('✅ Deleting question:', questionId);
-    
-    // Find the question being deleted for logging
+    // Find the question being deleted
     const questionToDelete = currentSurvey.questions.find(q => q.id === questionId);
-    if (questionToDelete) {
-      console.log('🗑️ Deleting question:', questionToDelete.text);
-    } else {
-      console.log('❌ Question not found:', questionId);
+    if (!questionToDelete) {
       showToastMessage("Question not found - refresh the page and try again.", 'error');
       return;
     }
     
     setCurrentSurvey(prev => {
       const newQuestions = prev.questions.filter(q => q.id !== questionId);
-      console.log('📝 Updated questions count:', prev.questions.length, '->', newQuestions.length);
       return {
         ...prev,
         questions: newQuestions
@@ -396,7 +380,6 @@ const SurveyBuilder = () => {
     
     // Close expanded question if it's the one being deleted
     if (expandedQuestion === questionId) {
-      console.log('📝 Closing expanded question');
       setExpandedQuestion(null);
     }
     
@@ -742,8 +725,6 @@ const SurveyBuilder = () => {
   
   // ***** Updated function to handle survey selection from the table *****
   const handleSelectSurvey = async (surveyId) => {
-    console.log('🔄 Loading survey for editing:', surveyId);
-    
     setIsSwitchingSurvey(true);
     
     // Clear current survey immediately to prevent showing old data
@@ -772,7 +753,6 @@ const SurveyBuilder = () => {
       await loadSurvey(surveyId);
       setActiveTab('builder');
     } catch (error) {
-      console.error('Failed to load survey:', error);
       // Stay on current tab if loading fails
     } finally {
       setIsSwitchingSurvey(false);
@@ -781,13 +761,11 @@ const SurveyBuilder = () => {
   
   // ***** New function to create new survey and switch to builder *****
   const handleCreateNewSurveyFromTab = () => {
-    console.log('🆕 Starting new survey creation');
     setIsCreateDialogOpen(true);
   };
   
   // ***** New function to handle "back to surveys" navigation *****
   const handleBackToSurveys = () => {
-    console.log('📋 Returning to surveys overview');
     setActiveTab('all-surveys');
   };
   

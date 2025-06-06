@@ -162,6 +162,7 @@ const UserManagement = () => {
     role: 'agent',
     status: 'active'
   });
+  const [error, setError] = useState(null);
 
   // Simulate API call to fetch users
   const fetchUsers = useCallback(async (refresh = false) => {
@@ -179,7 +180,7 @@ const UserManagement = () => {
       setUsers(mockUsers);
       
     } catch (error) {
-      console.error('Failed to fetch users:', error);
+      setError('Failed to fetch users');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -258,7 +259,7 @@ const UserManagement = () => {
       setIsAddUserOpen(false);
       
     } catch (error) {
-      console.error('Failed to create user:', error);
+      setError('Failed to create user');
     } finally {
       setIsCreating(false);
     }
@@ -284,7 +285,7 @@ const UserManagement = () => {
       setCurrentUser(null);
       
     } catch (error) {
-      console.error('Failed to update user:', error);
+      setError('Failed to update user');
     } finally {
       setIsUpdating(false);
     }
@@ -307,7 +308,7 @@ const UserManagement = () => {
       setCurrentUser(null);
       
     } catch (error) {
-      console.error('Failed to delete user:', error);
+      setError('Failed to delete user');
     } finally {
       setIsDeleting(false);
     }

@@ -48,6 +48,9 @@ const TwilioIntegration = () => {
   const [phoneNumbers, setPhoneNumbers] = useState([]);
   const [callLogs, setCallLogs] = useState([]);
   const [formChanged, setFormChanged] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [error, setError] = useState('');
   
   const [twilioSettings, setTwilioSettings] = useState({
     accountSid: 'AC1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p',
@@ -100,10 +103,42 @@ const TwilioIntegration = () => {
     // In a real app, you would show a toast notification here
   };
 
-  const saveSettings = () => {
-    console.log('Saving settings:', twilioSettings);
-    // In a real app, you would make an API call here
-    setFormChanged(false);
+  const handleSaveSettings = async () => {
+    try {
+      setIsSaving(true);
+      
+      // Validate required fields
+      if (!twilioSettings.accountSid || !twilioSettings.authToken || !twilioSettings.phoneNumber) {
+        setError('Please fill in all required fields');
+        return;
+      }
+
+      // Save settings to the API
+      const authToken = await getToken();
+      const response = await fetch(`${API_BASE_URL}/api/twilio/settings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify(twilioSettings)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save Twilio settings');
+      }
+
+      setSuccessMessage('Twilio settings saved successfully!');
+      setError('');
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
+      
+    } catch (error) {
+      setError(error.message || 'Failed to save Twilio settings');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -143,7 +178,7 @@ const TwilioIntegration = () => {
             Reset
           </Button>
           <Button 
-            onClick={saveSettings}
+            onClick={handleSaveSettings}
             disabled={!formChanged}
           >
             <Save className="mr-2 h-4 w-4" />

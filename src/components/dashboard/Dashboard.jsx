@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { 
   Card, 
   CardContent, 
@@ -110,16 +110,6 @@ const UpcomingCallSkeleton = () => (
 );
 
 const Dashboard = () => {
-  // Handle case where Clerk is not configured
-  let getToken;
-  try {
-    const auth = useAuth();
-    getToken = auth.getToken;
-  } catch (error) {
-    console.warn('Clerk authentication not available, continuing without auth');
-    getToken = async () => null;
-  }
-  
   const [apiStatus, setApiStatus] = useState('unknown');
   const [isLoading, setIsLoading] = useState(true);
   const [isStatsLoading, setIsStatsLoading] = useState(true);
@@ -279,7 +269,6 @@ const Dashboard = () => {
         }));
         setUpcomingCalls(scheduledCalls);
       } else {
-        console.warn('Calls data is not in expected format:', callsData);
         setRecentCalls([]);
         setUpcomingCalls([]);
       }
@@ -309,15 +298,15 @@ const Dashboard = () => {
         setApiStatus(result.status || 'connected');
       } catch (error) {
         setApiStatus('error');
-        console.warn('API connection test failed, continuing anyway:', error.message);
       }
       
       // Get auth token
       let token = null;
       try {
+        const { getToken } = useAuth();
         token = await getToken();
       } catch (error) {
-        console.warn('Failed to get auth token, continuing without auth:', error.message);
+        // Continue without auth for demo purposes
       }
 
       // Load data in parallel for better performance
@@ -328,7 +317,6 @@ const Dashboard = () => {
       ]);
 
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
       setError(error.message);
     } finally {
       setIsLoading(false);

@@ -698,11 +698,6 @@ const CallManagement = () => {
         makeAuthenticatedRequest('/surveys/stats/summary')
       ]);
 
-      console.log('📊 Raw API responses:');
-      console.log('  Calls response:', callsResponse);
-      console.log('  Stats response:', statsResponse);
-      console.log('  Survey stats response:', surveyStatsResponse);
-
       // Transform call data
       const transformedCalls = {
         active: [],
@@ -739,16 +734,8 @@ const CallManagement = () => {
         avgDuration: statsResponse.average_duration_seconds || 0
       };
 
-      console.log('📊 Processed stats:');
-      console.log('  Real stats object:', realStats);
-      console.log('  Average duration from API:', statsResponse.average_duration_seconds);
-      console.log('  Average duration in realStats:', realStats.avgDuration);
-
       setCallStats(realStats);
       setSurveyStats(surveyStatsResponse);
-
-      console.log('🔍 Final call stats set:', realStats);
-      console.log('🔍 Survey stats set:', surveyStatsResponse);
       
       // Mock campaigns for now (can be implemented later)
       setCampaigns([
@@ -767,7 +754,6 @@ const CallManagement = () => {
       ]);
       
     } catch (error) {
-      console.error('Error fetching call data:', error);
       setError('Failed to load call data. Please try again.');
       showToast(
         "Error", 
@@ -775,20 +761,17 @@ const CallManagement = () => {
         "error"
       );
     } finally {
-      // Ensure animation is visible for at least 800ms for better UX
       const elapsedTime = Date.now() - startTime;
-      const minDelay = 800;
       
-      if (elapsedTime < minDelay) {
-        await new Promise(resolve => setTimeout(resolve, minDelay - elapsedTime));
-      }
-      
-      setIsCallsLoading(false);
-      setIsStatsLoading(false);
-      setIsRefreshing(false);
-      setIsLoading(false);
+      // Ensure minimum loading time for smooth UX
+      const remainingTime = Math.max(0, 300 - elapsedTime);
+      setTimeout(() => {
+        setIsCallsLoading(false);
+        setIsStatsLoading(false);
+        setIsRefreshing(false);
+      }, remainingTime);
     }
-  }, [getToken, makeAuthenticatedRequest, transformCallData, showToast]);
+  }, [makeAuthenticatedRequest, getToken, transformCallData, showToast]);
 
   // Memoized filtered data calculation
   const getFilteredData = useMemo(() => {
@@ -841,23 +824,17 @@ const CallManagement = () => {
 
   // Memoized format avg duration function
   const formatAvgDuration = useCallback((seconds) => {
-    console.log('formatAvgDuration called with:', seconds, typeof seconds);
-    
     // Handle null, undefined, NaN, or non-numeric values
     if (!seconds || isNaN(seconds) || seconds <= 0) {
-      console.log('No valid duration data, returning 0:00');
       return '0:00';
     }
     
     // Ensure we have a number and round it
     const totalSeconds = Math.round(Number(seconds));
-    console.log('Rounded seconds:', totalSeconds);
     
     // Calculate minutes and remaining seconds
     const minutes = Math.floor(totalSeconds / 60);
     const remainingSeconds = totalSeconds % 60;
-    
-    console.log(`Formatted: ${minutes}:${remainingSeconds.toString().padStart(2, '0')}`);
     
     // Format as MM:SS
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
