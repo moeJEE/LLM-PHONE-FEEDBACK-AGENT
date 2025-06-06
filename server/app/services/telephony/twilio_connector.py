@@ -7,12 +7,17 @@ import hashlib
 import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional, Union
+import os
+from dotenv import load_dotenv
 
 from ...core.config import get_settings
 from ...core.logging import get_logger
 
 logger = get_logger("services.telephony.twilio_connector")
 settings = get_settings()
+
+# Load environment variables
+load_dotenv()
 
 class TwilioConnector:
     """Interface with Twilio API for phone call functionality"""
@@ -234,14 +239,16 @@ class TwilioConnector:
     
     def generate_welcome_twiml(self, welcome_message: Optional[str] = None) -> str:
         """
-        Generate TwiML for a welcome message and gather initial input
+        Generate TwiML for the initial welcome message and survey start
         
         Args:
-            welcome_message: The welcome message to say
+            welcome_message: Custom welcome message (optional)
         
         Returns:
             str: TwiML XML string
         """
+        webhook_base_url = os.getenv("WEBHOOK_BASE_URL", "https://your-ngrok-url.ngrok.io")
+        
         response = VoiceResponse()
         
         if not welcome_message:
@@ -255,7 +262,7 @@ class TwilioConnector:
         # Add gather for the first question - webhook for this will serve the first question
         gather = Gather(
             input='dtmf speech',
-            action='https://c6ef-197-153-72-10.ngrok-free.app/api/webhooks/twilio/gather',
+            action=f'{webhook_base_url}/api/webhooks/twilio/gather',
             method='POST',
             speech_timeout='auto',
             enhanced='true',
@@ -268,7 +275,7 @@ class TwilioConnector:
         
         # Add a fallback if no input is received
         response.say("I didn't receive any input. Let's try again.")
-        response.redirect('https://c6ef-197-153-72-10.ngrok-free.app/api/webhooks/twilio/voice')
+        response.redirect(f'{webhook_base_url}/api/webhooks/twilio/voice')
         
         return str(response)
     
@@ -284,6 +291,8 @@ class TwilioConnector:
         Returns:
             str: TwiML XML string
         """
+        webhook_base_url = os.getenv("WEBHOOK_BASE_URL", "https://your-ngrok-url.ngrok.io")
+        
         response = VoiceResponse()
         
         # Customize gather based on question type
@@ -292,7 +301,7 @@ class TwilioConnector:
             gather = Gather(
                 input='dtmf speech',
                 num_digits=1,
-                action='https://c6ef-197-153-72-10.ngrok-free.app/api/webhooks/twilio/gather',
+                action=f'{webhook_base_url}/api/webhooks/twilio/gather',
                 method='POST',
                 timeout=15,
                 speech_timeout='auto',
@@ -305,13 +314,13 @@ class TwilioConnector:
             
             # Fallback for no input
             response.say("I didn't receive your rating. Let's try again.")
-            response.redirect('https://c6ef-197-153-72-10.ngrok-free.app/api/webhooks/twilio/gather')
+            response.redirect(f'{webhook_base_url}/api/webhooks/twilio/gather')
             
         elif question_type == "yes_no":
             # For yes/no questions, allow both DTMF (1=yes, 2=no) and speech
             gather = Gather(
                 input='dtmf speech',
-                action='https://c6ef-197-153-72-10.ngrok-free.app/api/webhooks/twilio/gather',
+                action=f'{webhook_base_url}/api/webhooks/twilio/gather',
                 method='POST',
                 timeout=10,
                 speech_timeout='auto',
@@ -324,13 +333,13 @@ class TwilioConnector:
             
             # Fallback for no input
             response.say("I didn't receive your answer. Let's try again.")
-            response.redirect('https://c6ef-197-153-72-10.ngrok-free.app/api/webhooks/twilio/gather')
+            response.redirect(f'{webhook_base_url}/api/webhooks/twilio/gather')
             
         elif question_type == "multiple_choice":
             # For multiple choice, allow DTMF input based on the number of options
             gather = Gather(
                 input='dtmf speech',
-                action='https://c6ef-197-153-72-10.ngrok-free.app/api/webhooks/twilio/gather',
+                action=f'{webhook_base_url}/api/webhooks/twilio/gather',
                 method='POST',
                 timeout=15,
                 speech_timeout='auto',
@@ -353,13 +362,13 @@ class TwilioConnector:
             
             # Fallback for no input
             response.say("I didn't receive your selection. Let's try again.")
-            response.redirect('https://c6ef-197-153-72-10.ngrok-free.app/api/webhooks/twilio/gather')
+            response.redirect(f'{webhook_base_url}/api/webhooks/twilio/gather')
             
         else:  # Default to open-ended
             # For open-ended questions, we want speech input
             gather = Gather(
                 input='speech',
-                action='https://c6ef-197-153-72-10.ngrok-free.app/api/webhooks/twilio/gather',
+                action=f'{webhook_base_url}/api/webhooks/twilio/gather',
                 method='POST',
                 timeout=15,
                 speech_timeout='auto',
@@ -372,7 +381,7 @@ class TwilioConnector:
             
             # Fallback for no input
             response.say("I didn't hear your response. Let's try again.")
-            response.redirect('https://c6ef-197-153-72-10.ngrok-free.app/api/webhooks/twilio/gather')
+            response.redirect(f'{webhook_base_url}/api/webhooks/twilio/gather')
         
         return str(response)
     
@@ -416,3 +425,24 @@ class TwilioConnector:
         response.hangup()
         
         return str(response)
+
+def create_survey_twiml(survey, webhook_base_url=None):
+    """Generate TwiML for survey questions"""
+    if webhook_base_url is None:
+        webhook_base_url = os.getenv("WEBHOOK_BASE_URL", "https://your-ngrok-url.ngrok.io")
+    
+    # ... existing code ...
+    
+    gather = Gather(
+        input='dtmf speech',
+        action=f'{webhook_base_url}/api/webhooks/twilio/gather',
+        method='POST',
+        timeout=10,
+        speech_timeout='auto'
+    )
+    
+    # ... existing code ...
+    
+    response.redirect(f'{webhook_base_url}/api/webhooks/twilio/voice')
+    
+    # ... existing code ...

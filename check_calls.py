@@ -1,8 +1,16 @@
 import pymongo
+import os
+from dotenv import load_dotenv
 from datetime import datetime
 
+# Load environment variables
+load_dotenv()
+
+# Connect to MongoDB using environment variable
+mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:27017/")
+client = pymongo.MongoClient(mongodb_url)
+
 try:
-    client = pymongo.MongoClient('mongodb://localhost:27017/')
     db = client['llm_phone_feedback']
     
     # Get recent calls

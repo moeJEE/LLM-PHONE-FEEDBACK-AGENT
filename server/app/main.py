@@ -1,8 +1,10 @@
 from fastapi import FastAPI, Depends, Request, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, PlainTextResponse
 import uvicorn
 from contextlib import asynccontextmanager
+import os
+from twilio.twiml.voice_response import VoiceResponse, Gather
 
 from .core.config import get_settings
 from .core.logging import log_request, app_logger
@@ -94,51 +96,49 @@ async def root():
     }
 
 # Emergency webhook routes
-@app.post("/emergency/voice")
-async def emergency_voice():
-    """Emergency voice webhook - simple and fast"""
-    twiml = '''<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Say>Hello! Thank you for calling our survey. Press 1 to start or say something.</Say>
-    <Gather input="dtmf speech" action="https://c6ef-197-153-72-10.ngrok-free.app/emergency/gather" method="POST">
-        <Say>Please press 1 or say ready when you're ready to begin.</Say>
-    </Gather>
-    <Say>Thank you, goodbye.</Say>
-</Response>'''
-    return Response(content=twiml, media_type="application/xml")
+@app.get("/emergency", response_class=PlainTextResponse)
+async def emergency_flow():
+    """Emergency call flow"""
+    webhook_base_url = os.getenv("WEBHOOK_BASE_URL", "https://your-ngrok-url.ngrok.io")
+    
+    response = VoiceResponse()
+    response.say("Emergency services. Please state your emergency.")
+    
+    gather = Gather(
+        input="dtmf speech", 
+        action=f"{webhook_base_url}/emergency/gather", 
+        method="POST"
+    )
+    gather.say("Press 1 for fire, 2 for police, 3 for medical emergency")
+    response.append(gather)
+    
+    response.say("No input received. Please call back.")
+    response.hangup()
+    
+    return str(response)
 
-@app.post("/emergency/gather")
-async def emergency_gather(
-    CallSid: str = Form(None),
-    Digits: str = Form(None), 
-    SpeechResult: str = Form(None)
-):
-    """Emergency gather webhook - simple and fast"""
+@app.post("/emergency/gather", response_class=PlainTextResponse)
+async def emergency_gather():
+    """Handle emergency selection"""
+    webhook_base_url = os.getenv("WEBHOOK_BASE_URL", "https://your-ngrok-url.ngrok.io")
     
-    print(f"📞 Emergency Webhook Called on Main Server!")
-    print(f"   CallSid: {CallSid}")
-    print(f"   Digits: {Digits}")
-    print(f"   Speech: {SpeechResult}")
+    response = VoiceResponse()
+    response.say("Thank you for your selection. Emergency services are being contacted.")
     
-    # Simple response based on input
-    if Digits == "1" or (SpeechResult and "ready" in SpeechResult.lower()):
-        # First question
-        twiml = '''<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Gather input="dtmf speech" action="https://c6ef-197-153-72-10.ngrok-free.app/emergency/gather" method="POST" timeout="15" speechTimeout="auto">
-        <Say>On a scale from 1 to 5, how satisfied are you with our service? You can press a number or say your rating.</Say>
-    </Gather>
-    <Say>Thank you for your feedback!</Say>
-</Response>'''
-    else:
-        # Thank you message for any other response
-        twiml = '''<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Say>Thank you for your response! Your feedback has been recorded. Goodbye!</Say>
-    <Hangup/>
-</Response>'''
+    gather = Gather(
+        input="dtmf speech", 
+        action=f"{webhook_base_url}/emergency/gather", 
+        method="POST", 
+        timeout="15", 
+        speechTimeout="auto"
+    )
+    gather.say("Please provide additional details about your emergency.")
+    response.append(gather)
     
-    return Response(content=twiml, media_type="application/xml")
+    response.say("Emergency services have been notified. Help is on the way.")
+    response.hangup()
+    
+    return str(response)
 
 if __name__ == "__main__":
     uvicorn.run(

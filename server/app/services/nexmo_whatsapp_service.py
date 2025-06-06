@@ -11,6 +11,7 @@ import base64
 import hmac
 import hashlib
 import requests
+import os
 
 import vonage
 from vonage import VonageError
@@ -104,14 +105,14 @@ class NexmoWhatsAppService:
             }
         
         try:
-            # Use direct HTTP request instead of the Python library since it's causing validation issues
-            # Use sandbox URL for WhatsApp testing - requires phone number to be whitelisted
-            url = "https://messages-sandbox.nexmo.com/v1/messages"
+            # Use environment variable for API URL
+            api_url = os.getenv("NEXMO_MESSAGES_API_URL", "https://messages-sandbox.nexmo.com/v1/messages")
+            
             headers = {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                "Authorization": f"Bearer {self.jwt}",
+                "Content-Type": "application/json",
+                "Accept": "application/json"
             }
-            auth = (self.settings.NEXMO_API_KEY, self.settings.NEXMO_API_SECRET)
             
             message_data = {
                 "from": self.settings.NEXMO_WHATSAPP_FROM,
@@ -126,7 +127,7 @@ class NexmoWhatsAppService:
             logger.info(f"🔑 Using API Secret: {self.settings.NEXMO_API_SECRET[:8]}...")
             logger.info(f"📞 Using From Number: {self.settings.NEXMO_WHATSAPP_FROM}")
             
-            response = requests.post(url, json=message_data, headers=headers, auth=auth)
+            response = requests.post(api_url, json=message_data, headers=headers)
             
             if response.status_code in [200, 202]:
                 response_data = response.json()
